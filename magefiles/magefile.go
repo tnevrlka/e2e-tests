@@ -42,6 +42,7 @@ var (
 	jobType                    = utils.GetEnv("JOB_TYPE", "")
 	reposToDeleteDefaultRegexp = "jvm-build|e2e-dotnet|build-suite|e2e|pet-clinic-e2e|test-app|e2e-quayio|petclinic|test-app|integ-app|^dockerfile-|new-|^python|my-app|^test-|^multi-component"
 	repositoriesWithWebhooks   = []string{"devfile-sample-hello-world", "hacbs-test-project"}
+	focusFileArg               = ".*"
 )
 
 func (CI) parseJobSpec() error {
@@ -222,6 +223,41 @@ func (ci CI) TestE2E() error {
 		return fmt.Errorf("error when bootstrapping cluster: %v", err)
 	}
 
+	if pr.RepoName == "e2e-tests" {
+		token := utils.GetEnv(constants.GITHUB_TOKEN_ENV, "")
+		if token == "" {
+			return fmt.Errorf("empty GITHUB_TOKEN env. Please provide a valid github token")
+		}
+		ghClient, err := github.NewGithubClient(token, pr.Organization)
+		if err != nil {
+			return fmt.Errorf("error creating new GitHub client: %v", err)
+		}
+		files, err := ghClient.ListChangedFilesInPullRequest(pr.RepoName, pr.Number)
+		if err != nil {
+			return err
+		}
+
+		var e2eFoldersSet map[string]struct{}
+		testAll := false
+		for _, file := range files {
+			fileName := *file.Filename
+			if strings.HasPrefix(fileName, "tests") {
+				folder := fileName[4:]
+				e2eFoldersSet[folder] = struct{}{}
+			} else if strings.HasPrefix(fileName, "pkg") {
+				testAll = true
+				break
+			}
+		}
+		var e2eFolderNames []string
+		for folder := range e2eFoldersSet {
+			e2eFolderNames = append(e2eFolderNames, folder)
+		}
+		if !testAll {
+			focusFileArg = strings.Join(e2eFolderNames, " ")
+		}
+	}
+
 	if err := RunE2ETests(); err != nil {
 		testFailure = true
 	}
@@ -239,7 +275,7 @@ func (ci CI) TestE2E() error {
 
 func RunE2ETests() error {
 	// added --output-interceptor-mode=none to mitigate RHTAPBUGS-34
-	return sh.RunV("ginkgo", "-p", "--output-interceptor-mode=none", "--timeout=90m", fmt.Sprintf("--output-dir=%s", artifactDir), "--junit-report=e2e-report.xml", "--label-filter=$E2E_TEST_SUITE_LABEL", "./cmd", "--", "--generate-rppreproc-report=true", fmt.Sprintf("--rp-preproc-dir=%s", artifactDir))
+	return sh.RunV("ginkgo", "-p", "--output-interceptor-mode=none", "--timeout=90m", fmt.Sprintf("--focus-file=%s", focusFileArg), fmt.Sprintf("--output-dir=%s", artifactDir), "--junit-report=e2e-report.xml", "--label-filter=$E2E_TEST_SUITE_LABEL", "./cmd", "--", "--generate-rppreproc-report=true", fmt.Sprintf("--rp-preproc-dir=%s", artifactDir))
 }
 
 func PreflightChecks() error {
