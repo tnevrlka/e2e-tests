@@ -17,6 +17,14 @@ func (g *Github) ListPullRequests(repository string) ([]*github.PullRequest, err
 	return prs, nil
 }
 
+func (g *Github) ListChangedFilesInPullRequest(repository string, prNumber int) ([]*github.CommitFile, error) {
+	files, _, err := g.client.PullRequests.ListFiles(context.Background(), g.organization, repository, prNumber, &github.ListOptions{PerPage: 100})
+	if err != nil {
+		return nil, fmt.Errorf("error when listing changed files for pr number '%d' in repository '%s': %v", prNumber, repository, err)
+	}
+	return files, nil
+}
+
 func (g *Github) ListPullRequestCommentsSince(repository string, prNumber int, since time.Time) ([]*github.IssueComment, error) {
 	comments, _, err := g.client.Issues.ListComments(context.Background(), g.organization, repository, prNumber, &github.IssueListCommentsOptions{
 		Since:     &since,
