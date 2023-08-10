@@ -1,5 +1,7 @@
 package e2e
 
+// Test e2e-demo.go
+
 import (
 	"fmt"
 	"time"

@@ -1,5 +1,7 @@
 package enterprisecontract
 
+// Test contract.go
+
 import (
 	"fmt"
 	"time"
