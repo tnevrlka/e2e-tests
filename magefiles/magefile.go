@@ -237,7 +237,7 @@ func (ci CI) TestE2E() error {
 			return err
 		}
 
-		var e2eFoldersSet map[string]struct{}
+		e2eFoldersSet := make(map[string]struct{})
 		testAll := false
 		for _, file := range files {
 			fileName := *file.Filename
