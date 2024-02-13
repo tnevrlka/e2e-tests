@@ -16,6 +16,9 @@ import (
 var templates = map[string]string{
 	"test-file":          "templates/test_output_spec.tmpl",
 	"framework-describe": "templates/framework_describe_func.tmpl",
+
+	"specs":     "templates/specs.tmpl",
+	"barebones": "templates/barebones/barebones.tmpl",
 }
 
 func NewTemplateData(specOutline TestOutline, destination string) *TemplateData {

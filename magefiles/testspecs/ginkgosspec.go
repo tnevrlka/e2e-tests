@@ -3,6 +3,7 @@ package testspecs
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"os"
 	"path/filepath"
@@ -134,15 +135,11 @@ func generateGinkgoSpec(cwd string, destination string, dataFile string) error {
 	// Doing this to avoid errcheck flagging this in a defer.
 	// Refer to https://github.com/kisielk/errcheck
 	// issues 101, 77, 55
-	tmpl, err := GetTemplate("test-file")
-	if err != nil {
-		return err
-	}
-
-	fullTemplatePath := fmt.Sprintf("%s/%s", cwd, tmpl)
+	tmplFile, err := mergeTemplates("barebones", "specs")
+	defer os.Remove(tmplFile.Name())
 
 	klog.Infof("Creating new test package directory and spec file %s.\n", destination)
-	_, err = ginkgoGenerateSpecCmd("--template", fullTemplatePath, "--template-data", dataFile)
+	_, err = ginkgoGenerateSpecCmd("--template", tmplFile.Name(), "--template-data", dataFile)
 	if err != nil {
 		err = os.Remove(ginkgoFileName)
 		if err != nil {
@@ -168,6 +165,43 @@ func generateGinkgoSpec(cwd string, destination string, dataFile string) error {
 		return err
 	}
 	return err
+}
+
+// mergeTemplates creates a new template file from files provided in the argument
+func mergeTemplates(fileNames ...string) (*os.File, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	tempFile, err := os.CreateTemp(cwd, "merged-tmpl")
+	if err != nil {
+		return nil, err
+	}
+	defer tempFile.Close()
+
+	for _, fileName := range fileNames {
+		tmplPath, err := GetTemplate(fileName)
+		if err != nil {
+			return nil, err
+		}
+		tmplFile, err := os.Open(cwd + "/" + tmplPath)
+		if err != nil {
+			return nil, err
+		}
+		defer tmplFile.Close()
+
+		_, err = io.Copy(tempFile, tmplFile)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = tempFile.Write([]byte{'\n', '\n'})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return tempFile, nil
 }
 
 // createTestPath will create the full test path in the tests
